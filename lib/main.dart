@@ -1,28 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:frontend/core/router/app_router.dart';
-import 'package:frontend/core/theme/app_theme.dart';
+import 'screens/home_screen.dart';
 
 void main() {
-  runApp(
-    const ProviderScope(
-      child: MyApp(),
-    ),
-  );
+  runApp(const FishSurveysApp());
 }
 
-class MyApp extends ConsumerWidget {
-  const MyApp({super.key});
+class FishSurveysApp extends StatelessWidget {
+  const FishSurveysApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final router = ref.watch(routerProvider);
-    
-    return MaterialApp.router(
-      title: 'Fish Survey Reports',
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      routerConfig: router,
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Fish Surveys',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        useMaterial3: true,
+      ),
+      home: const HomeScreen(),
     );
   }
-}
+} 
