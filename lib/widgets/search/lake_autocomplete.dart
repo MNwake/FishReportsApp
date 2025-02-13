@@ -4,99 +4,125 @@ import 'package:flutter/material.dart';
 class LakeAutocomplete extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
-  final String? selectedLake;
+  final List<String> selectedLakes;
   final List<String> availableLakes;
-  final Function(String) onSelected;
+  final Function(List<String>) onSelectionChanged;
   final Function() onClear;
 
   const LakeAutocomplete({
     super.key,
     required this.controller,
     required this.focusNode,
-    required this.selectedLake,
+    required this.selectedLakes,
     required this.availableLakes,
-    required this.onSelected,
+    required this.onSelectionChanged,
     required this.onClear,
   });
 
   @override
   Widget build(BuildContext context) {
-    return RawAutocomplete<String>(
-      focusNode: focusNode,
-      textEditingController: controller,
-      displayStringForOption: (String option) => option,
-      optionsBuilder: (TextEditingValue textEditingValue) {
-        if (textEditingValue.text.isEmpty) {
-          print("DEBUG: optionsBuilder returning availableLakes: ${availableLakes.length}");
-          return availableLakes;
-        }
-        final options = availableLakes.where((lake) =>
-            lake.toLowerCase().contains(textEditingValue.text.toLowerCase()));
-        print("DEBUG: optionsBuilder filtered options: ${options.toList()}");
-        return options;
-      },
-      onSelected: onSelected,
-      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-        return TextFormField(
+    return Column(
+      children: [
+        TextFormField(
           controller: controller,
           focusNode: focusNode,
+          readOnly: true,
           decoration: InputDecoration(
-            labelText: 'Lake Name',
+            labelText: 'Lakes',
             border: const OutlineInputBorder(),
             prefixIcon: const Icon(Icons.search),
-            suffixIcon: controller.text.isNotEmpty
+            suffixIcon: selectedLakes.isNotEmpty
                 ? IconButton(
                     icon: const Icon(Icons.clear),
                     onPressed: onClear,
                   )
                 : null,
           ),
-          onEditingComplete: () {
-            focusNode.unfocus();
+          onTap: () {
+            _showMultiSelect(context);
           },
-        );
-      },
-      optionsViewBuilder: (context, onSelected, options) {
-        print("DEBUG: optionsViewBuilder, options count: ${options.length}");
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4.0,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 300, maxWidth: 350),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8.0),
-                    color: Theme.of(context).colorScheme.surfaceVariant,
-                    child: Text(
-                      'Available Lakes (${availableLakes.length})',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                  ),
-                  Flexible(
-                    child: ListView.builder(
-                      padding: EdgeInsets.zero,
-                      shrinkWrap: true,
-                      itemCount: options.length,
-                      itemBuilder: (context, index) {
-                        final option = options.elementAt(index);
-                        return ListTile(
-                          title: Text(option),
-                          onTap: () {
-                            onSelected(option);
-                            FocusScope.of(context).unfocus();
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
+        ),
+        if (selectedLakes.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Wrap(
+              spacing: 8.0,
+              children: selectedLakes
+                  .map((lake) => Chip(
+                        label: Text(lake),
+                        onDeleted: () {
+                          final newSelection = List<String>.from(selectedLakes)
+                            ..remove(lake);
+                          onSelectionChanged(newSelection);
+                        },
+                      ))
+                  .toList(),
             ),
           ),
+      ],
+    );
+  }
+
+  Future<void> _showMultiSelect(BuildContext context) async {
+    final List<String> tempSelection = List.from(selectedLakes);
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Select Lakes'),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return SizedBox(
+                width: double.maxFinite,
+                height: 400, // Fixed height for scrolling
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text('Available Lakes: ${availableLakes.length}'),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: availableLakes.length,
+                        itemBuilder: (context, index) {
+                          final lake = availableLakes[index];
+                          return CheckboxListTile(
+                            title: Text(lake),
+                            value: tempSelection.contains(lake),
+                            onChanged: (bool? value) {
+                              setState(() {
+                                if (value == true) {
+                                  tempSelection.add(lake);
+                                } else {
+                                  tempSelection.remove(lake);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                onSelectionChanged(tempSelection);
+                controller.text = tempSelection.join(', ');
+                Navigator.pop(context);
+              },
+              child: const Text('Apply'),
+            ),
+          ],
         );
       },
     );

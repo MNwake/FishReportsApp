@@ -58,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showAdvancedSearch() async {
-    print("DEBUG: Opening advanced search with state: species=${_searchState.species}, county=${_searchState.county?.countyName}, lake=${_searchState.lake}");
+    print("DEBUG: Opening advanced search with state: species=${_searchState.species}, counties=${_searchState.counties.map((c) => c.countyName)}, lakes=${_searchState.lakes}");
     
     final result = await showModalBottomSheet<dynamic>(
       context: context,
@@ -77,13 +77,13 @@ class _HomeScreenState extends State<HomeScreen> {
           mostCaught = result['mostCaught'] as List<FishData>;
           if (result['searchState'] != null) {
             _searchState = result['searchState'] as AdvancedSearchState;
-            print("DEBUG: Updated search state from map: species=${_searchState.species}, county=${_searchState.county?.countyName}, lake=${_searchState.lake}");
+            print("DEBUG: Updated search state from map: species=${_searchState.species}, counties=${_searchState.counties.map((c) => c.countyName)}, lakes=${_searchState.lakes}");
           }
         });
       } else if (result is AdvancedSearchState) {
         setState(() {
           _searchState = result;
-          print("DEBUG: Updated search state directly: species=${_searchState.species}, county=${_searchState.county?.countyName}, lake=${_searchState.lake}");
+          print("DEBUG: Updated search state directly: species=${_searchState.species}, counties=${_searchState.counties.map((c) => c.countyName)}, lakes=${_searchState.lakes}");
         });
       }
     } else {

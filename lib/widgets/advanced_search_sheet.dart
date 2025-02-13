@@ -22,14 +22,14 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
   final _formKey = GlobalKey<FormState>();
 
   // Selected values
-  String? selectedSpecies;
-  County? selectedCounty;
-  String? selectedLake;
+  List<String> selectedSpecies = [];
+  List<County> selectedCounties = [];
+  List<String> selectedLakes = [];
 
   // Available options
-  List<String> availableLakes = []; // This will be filtered based on county
+  List<String> availableLakes = [];
   List<County> allCounties = [];
-  List<int> yearOptions = []; // Fixed: now properly populated
+  List<int> yearOptions = [];
 
   // Other state
   int? minYear;
@@ -50,19 +50,21 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
   @override
   void initState() {
     super.initState();
-    print("DEBUG: AdvancedSearchSheet initState with initialState: species=${widget.initialState.species}, county=${widget.initialState.county?.countyName}, lake=${widget.initialState.lake}");
+    print("DEBUG: AdvancedSearchSheet initState with initialState: species=${widget.initialState.species}, counties=${widget.initialState.counties.map((c) => c.countyName)}, lakes=${widget.initialState.lakes}");
     
-    selectedSpecies = widget.initialState.species;
-    selectedCounty = widget.initialState.county;
-    selectedLake = widget.initialState.lake;
+    selectedSpecies = List.from(widget.initialState.species);
+    selectedCounties = List.from(widget.initialState.counties);
+    selectedLakes = List.from(widget.initialState.lakes);
+    minYear = widget.initialState.minYear;
+    maxYear = widget.initialState.maxYear;
     gameFishOnly = widget.initialState.gameFishOnly;
     
-    // Initialize text controllers accordingly
-    _speciesController.text = widget.initialState.species ?? '';
-    _countyController.text = widget.initialState.county?.countyName ?? '';
-    _lakeController.text = widget.initialState.lake ?? '';
+    // Initialize text controllers
+    _speciesController.text = selectedSpecies.join(', ');
+    _countyController.text = selectedCounties.map((c) => c.countyName).join(', ');
+    _lakeController.text = selectedLakes.join(', ');
     
-    print("DEBUG: Controllers initialized: species=${_speciesController.text}, county=${_countyController.text}, lake=${_lakeController.text}");
+    print("DEBUG: Controllers initialized: species=${_speciesController.text}, counties=${_countyController.text}, lakes=${_lakeController.text}");
 
     _loadData();
     _initializeYearOptions();
@@ -84,8 +86,12 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
   // Update available lakes when county changes
   void _updateAvailableLakes() {
     setState(() {
-      if (selectedCounty != null) {
-        availableLakes = List<String>.from(selectedCounty!.lakes);
+      if (selectedCounties.isNotEmpty) {
+        availableLakes = selectedCounties
+            .expand((county) => county.lakes)
+            .toSet()
+            .toList()
+          ..sort();
       } else {
         availableLakes = allCounties
             .expand((county) => county.lakes)
@@ -93,58 +99,35 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
             .toList()
           ..sort();
       }
-      // Clear lake selection if it's not in the available lakes
-      if (selectedLake != null && !availableLakes.contains(selectedLake)) {
-        selectedLake = null;
-        _lakeController.clear();
-      }
+      // Clear lake selections if they're not in available lakes
+      selectedLakes.removeWhere((lake) => !availableLakes.contains(lake));
+      _lakeController.text = selectedLakes.join(', ');
     });
   }
 
-  void _handleSpeciesSelected(Species species) {
+  void _handleSpeciesChanged(List<String> species) {
     setState(() {
-      selectedSpecies = species.commonName;
-      _speciesController.text = species.commonName;
-      print("DEBUG: Species selected: ${selectedSpecies}");
+      selectedSpecies = species;
+      _speciesController.text = species.join(', ');
     });
+    print("DEBUG: Species changed: $selectedSpecies");
   }
 
-  void _handleCountySelected(County county) {
+  void _handleCountiesChanged(List<County> counties) {
     setState(() {
-      selectedCounty = county;
-      _countyController.text = county.countyName;
-      _updateAvailableLakes();
-      print("DEBUG: County selected: ${selectedCounty?.countyName}");
-    });
-    // Future.delayed(const Duration(milliseconds: 100), () {
-    //   _lakeFocus.requestFocus();
-    //   print("DEBUG: Lake focus requested delayed");
-    // });
-  }
-
-  void _handleLakeSelected(String lake) {
-    setState(() {
-      selectedLake = lake;
-      _lakeController.text = lake;
-    });
-    print("DEBUG: Lake selected: $lake");
-  }
-
-  void _handleCountyCleared() {
-    setState(() {
-      selectedCounty = null;
-      _countyController.clear();
-      selectedLake = null;
-      _lakeController.clear();
+      selectedCounties = counties;
+      _countyController.text = counties.map((c) => c.countyName).join(', ');
       _updateAvailableLakes();
     });
+    print("DEBUG: Counties changed: ${selectedCounties.map((c) => c.countyName)}");
   }
 
-  void _initializeYearOptions() {
-    final currentYear = DateTime.now().year;
+  void _handleLakesChanged(List<String> lakes) {
     setState(() {
-      yearOptions = List.generate(currentYear - 1950 + 1, (index) => currentYear - index);
+      selectedLakes = lakes;
+      _lakeController.text = lakes.join(', ');
     });
+    print("DEBUG: Lakes changed: $selectedLakes");
   }
 
   @override
@@ -213,13 +196,13 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
           onPressed: () {
             final state = AdvancedSearchState(
               species: selectedSpecies,
-              county: selectedCounty,
-              lake: selectedLake,
+              counties: selectedCounties,
+              lakes: selectedLakes,
               minYear: minYear,
               maxYear: maxYear,
               gameFishOnly: gameFishOnly,
             );
-            print("DEBUG: Closing sheet with state: species=${state.species}, county=${state.county?.countyName}, lake=${state.lake}");
+            print("DEBUG: Closing sheet with state: species=$selectedSpecies, counties=${selectedCounties.map((c) => c.countyName)}, lakes=$selectedLakes");
             Navigator.pop(context, state);
           }
         ),
@@ -237,12 +220,11 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
           focusNode: _speciesFocus,
           selectedSpecies: selectedSpecies,
           allSpecies: snapshot.data!,
-          onSelected: _handleSpeciesSelected,
+          onSelectionChanged: _handleSpeciesChanged,
           onClear: () => setState(() {
-            selectedSpecies = null;
+            selectedSpecies.clear();
             _speciesController.clear();
           }),
-          onFocusLost: _handleFocusLost,
         );
       },
     );
@@ -250,27 +232,28 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
 
   Widget _buildCountySection() {
     return CountyAutocomplete(
-      key: ValueKey(selectedCounty?.countyName ?? "all"),
       controller: _countyController,
       focusNode: _countyFocus,
-      selectedCounty: selectedCounty?.countyName,
+      selectedCounties: selectedCounties,
       allCounties: allCounties,
-      onSelected: _handleCountySelected,
-      onClear: _handleCountyCleared,
-      onFocusLost: _handleFocusLost,
+      onSelectionChanged: _handleCountiesChanged,
+      onClear: () => setState(() {
+        selectedCounties.clear();
+        _countyController.clear();
+        _updateAvailableLakes();
+      }),
     );
   }
 
   Widget _buildLakeSection() {
     return LakeAutocomplete(
-      key: ValueKey(selectedCounty?.countyName ?? "all"),
       controller: _lakeController,
       focusNode: _lakeFocus,
-      selectedLake: selectedLake,
+      selectedLakes: selectedLakes,
       availableLakes: availableLakes,
-      onSelected: _handleLakeSelected,
+      onSelectionChanged: _handleLakesChanged,
       onClear: () => setState(() {
-        selectedLake = null;
+        selectedLakes.clear();
         _lakeController.clear();
       }),
     );
@@ -316,49 +299,42 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
             final searchParams = _buildSearchParams();
             final searchState = AdvancedSearchState(
               species: selectedSpecies,
-              county: selectedCounty,
-              lake: selectedLake,
+              counties: selectedCounties,
+              lakes: selectedLakes,
               minYear: minYear,
               maxYear: maxYear,
               gameFishOnly: gameFishOnly,
             );
-            print("DEBUG: Search button pressed with state: species=${searchState.species}, county=${searchState.county?.countyName}, lake=${searchState.lake}");
+            print("DEBUG: Search button pressed with params: $searchParams");
             
             // Get the filtered data using the API service
             final recentSurveys = await _apiService.getRecentSurveys(
-              search: searchParams['search'],
               species: searchParams['species'],
-              counties: searchParams['county'] != null 
-                  ? (searchParams['county'] as List<String>)  // Cast to correct type
-                  : null,
+              county: searchParams['county'],
+              lake: searchParams['lake'],
               minYear: searchParams['minYear'],
               maxYear: searchParams['maxYear'],
               gameFishOnly: searchParams['game_fish'] == 'true',
             );
 
             final biggestFish = await _apiService.getBiggestFish(
-              search: searchParams['search'],
               species: searchParams['species'],
-              counties: searchParams['county'] != null 
-                  ? (searchParams['county'] as List<String>)  // Cast to correct type
-                  : null,
+              county: searchParams['county'],
+              lake: searchParams['lake'],
               minYear: searchParams['minYear'],
               maxYear: searchParams['maxYear'],
               gameFishOnly: searchParams['game_fish'] == 'true',
             );
 
             final mostCaught = await _apiService.getMostCaught(
-              search: searchParams['search'],
               species: searchParams['species'],
-              counties: searchParams['county'] != null 
-                  ? (searchParams['county'] as List<String>)  // Cast to correct type
-                  : null,
+              county: searchParams['county'],
+              lake: searchParams['lake'],
               minYear: searchParams['minYear'],
               maxYear: searchParams['maxYear'],
               gameFishOnly: searchParams['game_fish'] == 'true',
             );
 
-            // Return the results to HomeScreen
             if (mounted) {
               Navigator.pop(context, {
                 'recentSurveys': recentSurveys,
@@ -369,7 +345,7 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
               });
             }
           } catch (e) {
-            // Show error dialog
+            print("DEBUG: Error during search: $e");
             if (mounted) {
               showDialog(
                 context: context,
@@ -392,21 +368,23 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
     );
   }
 
-  // Add this method to build the search parameters
+  // Update the search parameters builder to match the API expectations
   Map<String, dynamic> _buildSearchParams() {
-    String? cleanCountyName;
-    if (selectedCounty != null) {
-      // Remove the word "County" and trim any whitespace
-      cleanCountyName = selectedCounty!.countyName.replaceAll(' County', '');
-    }
-
     return {
-      if (selectedSpecies != null) 'species': selectedSpecies,
-      if (cleanCountyName != null) 'county': <String>[cleanCountyName],
-      if (selectedLake != null) 'search': selectedLake,
+      if (selectedSpecies.isNotEmpty) 'species': selectedSpecies,
+      if (selectedCounties.isNotEmpty) 
+        'county': selectedCounties
+            .map((county) => county.countyName.replaceAll(' County', ''))
+            .toList(),
+      if (selectedLakes.isNotEmpty) 'lake': selectedLakes,
       if (minYear != null) 'minYear': minYear.toString(),
       if (maxYear != null) 'maxYear': maxYear.toString(),
       if (gameFishOnly) 'game_fish': 'true',
     };
+  }
+
+  void _initializeYearOptions() {
+    final currentYear = DateTime.now().year;
+    yearOptions = List.generate(30, (index) => currentYear - index);
   }
 }

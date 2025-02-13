@@ -5,11 +5,10 @@ import '../../models/species.dart';
 class SpeciesAutocomplete extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
-  final String? selectedSpecies;
+  final List<String> selectedSpecies;
   final List<Species> allSpecies;
-  final Function(Species) onSelected;
+  final Function(List<String>) onSelectionChanged;
   final Function() onClear;
-  final Function(TextEditingController, String?, Function()) onFocusLost;
 
   const SpeciesAutocomplete({
     super.key,
@@ -17,90 +16,103 @@ class SpeciesAutocomplete extends StatelessWidget {
     required this.focusNode,
     required this.selectedSpecies,
     required this.allSpecies,
-    required this.onSelected,
+    required this.onSelectionChanged,
     required this.onClear,
-    required this.onFocusLost,
   });
 
   @override
   Widget build(BuildContext context) {
-    return RawAutocomplete<Species>(
-      focusNode: focusNode,
-      textEditingController: controller,
-      displayStringForOption: (Species option) => option.commonName,
-      optionsBuilder: (TextEditingValue textEditingValue) {
-        if (textEditingValue.text.isEmpty) {
-          return allSpecies;
-        }
-        return allSpecies.where((species) => species.commonName
-            .toLowerCase()
-            .contains(textEditingValue.text.toLowerCase()));
-      },
-      onSelected: (Species selection) {
-        onSelected(selection);
-        // Update the controller text here.
-        controller.text = selection.commonName;
-        print("DEBUG: Species selected on autocomplete: ${selection.commonName}");
-      },
-      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-        return Focus(
-          onFocusChange: (hasFocus) {
-            if (!hasFocus) {
-              onFocusLost(controller, selectedSpecies, onClear);
-            }
+    return Column(
+      children: [
+        TextFormField(
+          controller: controller,
+          focusNode: focusNode,
+          readOnly: true,
+          decoration: InputDecoration(
+            labelText: 'Species',
+            border: const OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: selectedSpecies.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: onClear,
+                  )
+                : null,
+          ),
+          onTap: () {
+            _showMultiSelect(context);
           },
-          child: TextFormField(
-            controller: controller,
-            focusNode: focusNode,
-            decoration: InputDecoration(
-              labelText: 'Species',
-              border: const OutlineInputBorder(),
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: controller.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: onClear,
-                    )
-                  : null,
+        ),
+        if (selectedSpecies.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Wrap(
+              spacing: 8.0,
+              children: selectedSpecies
+                  .map((species) => Chip(
+                        label: Text(species),
+                        onDeleted: () {
+                          final newSelection = List<String>.from(selectedSpecies)
+                            ..remove(species);
+                          onSelectionChanged(newSelection);
+                        },
+                      ))
+                  .toList(),
             ),
-            onChanged: (value) {
-              final matches = allSpecies.where((species) =>
-                  species.commonName.toLowerCase().contains(value.toLowerCase()));
-              if (matches.isEmpty && value.isNotEmpty) {
-                controller.text = controller.text.substring(0, controller.text.length - 1);
-                controller.selection = TextSelection.fromPosition(
-                  TextPosition(offset: controller.text.length),
-                );
-              }
+          ),
+      ],
+    );
+  }
+
+  Future<void> _showMultiSelect(BuildContext context) async {
+    final List<String> tempSelection = List.from(selectedSpecies);
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Select Species'),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: allSpecies.length,
+                  itemBuilder: (context, index) {
+                    final species = allSpecies[index];
+                    return CheckboxListTile(
+                      title: Text(species.commonName),
+                      value: tempSelection.contains(species.commonName),
+                      onChanged: (bool? value) {
+                        setState(() {
+                          if (value == true) {
+                            tempSelection.add(species.commonName);
+                          } else {
+                            tempSelection.remove(species.commonName);
+                          }
+                        });
+                      },
+                    );
+                  },
+                ),
+              );
             },
           ),
-        );
-      },
-      optionsViewBuilder: (context, onSelected, options) {
-        if (!focusNode.hasFocus) return Container();
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4.0,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 200, maxWidth: 350),
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                itemCount: options.length,
-                itemBuilder: (context, index) {
-                  final option = options.elementAt(index);
-                  return ListTile(
-                    title: Text(option.commonName),
-                    onTap: () {
-                      onSelected(option);
-                      FocusScope.of(context).unfocus();
-                    },
-                  );
-                },
-              ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
             ),
-          ),
+            TextButton(
+              onPressed: () {
+                onSelectionChanged(tempSelection);
+                controller.text = tempSelection.join(', ');
+                Navigator.pop(context);
+              },
+              child: const Text('Apply'),
+            ),
+          ],
         );
       },
     );
