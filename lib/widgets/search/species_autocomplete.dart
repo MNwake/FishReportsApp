@@ -74,15 +74,20 @@ class SpeciesAutocomplete extends StatelessWidget {
           title: const Text('Select Species'),
           content: StatefulBuilder(
             builder: (context, setState) {
+              // Sort species alphabetically by common name
+              final sortedSpecies = List<Species>.from(allSpecies)
+                ..sort((a, b) => a.commonName.compareTo(b.commonName));
+                
               return SizedBox(
                 width: double.maxFinite,
                 child: ListView.builder(
                   shrinkWrap: true,
-                  itemCount: allSpecies.length,
+                  itemCount: sortedSpecies.length,
                   itemBuilder: (context, index) {
-                    final species = allSpecies[index];
+                    final species = sortedSpecies[index];
                     return CheckboxListTile(
                       title: Text(species.commonName),
+                      subtitle: species.gameFish ? const Text('Game Fish') : null,
                       value: tempSelection.contains(species.commonName),
                       onChanged: (bool? value) {
                         setState(() {

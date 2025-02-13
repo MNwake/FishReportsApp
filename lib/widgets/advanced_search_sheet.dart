@@ -47,6 +47,9 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
   final FocusNode _countyFocus = FocusNode();
   final FocusNode _lakeFocus = FocusNode();
 
+  // Add this field
+  List<Species> allSpecies = [];
+
   @override
   void initState() {
     super.initState();
@@ -67,6 +70,7 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
     print("DEBUG: Controllers initialized: species=${_speciesController.text}, counties=${_countyController.text}, lakes=${_lakeController.text}");
 
     _loadData();
+    _loadSpecies();
     _initializeYearOptions();
   }
 
@@ -80,6 +84,13 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
           .toSet()
           .toList()
         ..sort();
+    });
+  }
+
+  void _loadSpecies() async {
+    final species = await _apiService.getSpecies();
+    setState(() {
+      allSpecies = species;
     });
   }
 
@@ -165,6 +176,8 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
               children: [
                 _buildHeader(),
                 const SizedBox(height: 16),
+                _buildGameFishSwitch(),
+                const SizedBox(height: 16),
                 _buildSpeciesSection(),
                 const SizedBox(height: 16),
                 _buildCountySection(),
@@ -172,8 +185,6 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
                 _buildLakeSection(),
                 const SizedBox(height: 16),
                 _buildYearSection(),
-                const SizedBox(height: 16),
-                _buildGameFishSwitch(),
                 const SizedBox(height: 24),
                 _buildSearchButton(),
                 if (MediaQuery.of(context).viewInsets.bottom > 0)
@@ -215,11 +226,17 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
       future: _apiService.getSpecies(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const CircularProgressIndicator();
+        
+        // Filter species list if game fish only is selected
+        final filteredSpecies = gameFishOnly 
+            ? snapshot.data!.where((s) => s.gameFish).toList()
+            : snapshot.data!;
+            
         return SpeciesAutocomplete(
           controller: _speciesController,
           focusNode: _speciesFocus,
           selectedSpecies: selectedSpecies,
-          allSpecies: snapshot.data!,
+          allSpecies: filteredSpecies,
           onSelectionChanged: _handleSpeciesChanged,
           onClear: () => setState(() {
             selectedSpecies.clear();
@@ -287,7 +304,20 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
     return SwitchListTile(
       title: const Text('Game Fish Only'),
       value: gameFishOnly,
-      onChanged: (value) => setState(() => gameFishOnly = value),
+      onChanged: (bool value) {
+        setState(() {
+          gameFishOnly = value;
+          // Clear species selection if switching to game fish only and non-game fish were selected
+          if (value) {
+            final gameSpecies = allSpecies
+                .where((s) => s.gameFish)
+                .map((s) => s.commonName)
+                .toList();
+            selectedSpecies.removeWhere((species) => !gameSpecies.contains(species));
+            _speciesController.text = selectedSpecies.join(', ');
+          }
+        });
+      },
     );
   }
 
