@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/home_screen.dart';
+import 'screens/species_screen.dart';
+import 'screens/county_screen.dart';
 
 void main() {
-  runApp(const FishSurveysApp());
+  runApp(
+    const ProviderScope(
+      child: FishSurveysApp(),
+    ),
+  );
 }
 
 class FishSurveysApp extends StatelessWidget {
@@ -12,6 +19,7 @@ class FishSurveysApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Fish Surveys',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,

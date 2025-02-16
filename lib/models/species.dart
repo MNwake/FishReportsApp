@@ -1,4 +1,5 @@
 class Species {
+  final String id;
   final String commonName;
   final bool gameFish;
   final String imageUrl;
@@ -7,6 +8,7 @@ class Species {
   final String? speciesGroup;
 
   Species({
+    required this.id,
     required this.commonName,
     required this.gameFish,
     required this.imageUrl,
@@ -17,6 +19,7 @@ class Species {
 
   factory Species.fromJson(Map<String, dynamic> json) {
     return Species(
+      id: json['id'] as String,
       commonName: json['common_name'] as String,
       gameFish: (json['game_fish'] as String).toLowerCase() == 'true',
       imageUrl: json['image_url'] as String,
@@ -27,6 +30,7 @@ class Species {
   }
 
   Map<String, dynamic> toJson() => {
+    'id': id,
     'common_name': commonName,
     'game_fish': gameFish,
     'image_url': imageUrl,

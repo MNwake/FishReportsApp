@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/survey.dart';
 import '../screens/survey_detail_screen.dart';
+import '../models/fish_data.dart';
 
 class SurveyCard extends StatelessWidget {
   final FishData survey;

@@ -1,4 +1,5 @@
 class County {
+  final String id;
   final String countyName;
   final String fipsCode;
   final String countySeat;
@@ -11,6 +12,7 @@ class County {
   final List<String> lakes;
 
   County({
+    required this.id,
     required this.countyName,
     required this.fipsCode,
     required this.countySeat,
@@ -26,6 +28,7 @@ class County {
   factory County.fromJson(Map<String, dynamic> json) {
     try {
       return County(
+        id: json['id']?.toString() ?? '',
         countyName: json['county_name']?.toString() ?? '',
         fipsCode: json['fips_code']?.toString() ?? '',
         countySeat: json['county_seat']?.toString() ?? '',
@@ -44,6 +47,7 @@ class County {
   }
 
   Map<String, dynamic> toJson() => {
+    'id': id,
     'county_name': countyName,
     'fips_code': fipsCode,
     'county_seat': countySeat,

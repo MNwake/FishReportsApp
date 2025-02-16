@@ -8,11 +8,20 @@ import './search/species_autocomplete.dart';
 import './search/county_autocomplete.dart';
 import './search/lake_autocomplete.dart';
 import './search/year_dropdown.dart';
+import '../models/survey.dart';
+import '../models/fish_data.dart';
 
 class AdvancedSearchSheet extends StatefulWidget {
   final AdvancedSearchState initialState;
-  const AdvancedSearchSheet({super.key, required this.initialState});
+  final Function(Map<String, dynamic>)? onSearchComplete;
+  final Function(String)? onSearchError;
 
+  const AdvancedSearchSheet({
+    super.key, 
+    required this.initialState,
+    this.onSearchComplete,
+    this.onSearchError,
+  });
 
   @override
   State<AdvancedSearchSheet> createState() => _AdvancedSearchSheetState();
@@ -32,8 +41,8 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
   List<int> yearOptions = [];
 
   // Other state
-  int? minYear;
-  int? maxYear;
+  String? minYear;
+  String? maxYear;
   bool gameFishOnly = false;
 
   // Services and controllers
@@ -49,6 +58,9 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
 
   // Add this field
   List<Species> allSpecies = [];
+
+  // Add this state variable
+  List<FishData> availableSurveys = [];
 
   @override
   void initState() {
@@ -72,6 +84,7 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
     _loadData();
     _loadSpecies();
     _initializeYearOptions();
+    _loadSurveys();
   }
 
   void _loadData() async {
@@ -176,15 +189,41 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
               children: [
                 _buildHeader(),
                 const SizedBox(height: 16),
-                _buildGameFishSwitch(),
+                _buildFilterSection(
+                  title: 'Species',
+                  items: selectedSpecies,
+                  onAddPressed: () => _showSpeciesSelector(context),
+                  onItemDeleted: (species) {
+                    final newSelection = List<String>.from(selectedSpecies)
+                      ..remove(species);
+                    _handleSpeciesChanged(newSelection);
+                  },
+                ),
                 const SizedBox(height: 16),
-                _buildSpeciesSection(),
+                _buildFilterSection(
+                  title: 'Counties',
+                  items: selectedCounties.map((c) => c.countyName).toList(),
+                  onAddPressed: () => _showCountySelector(context),
+                  onItemDeleted: (county) {
+                    final newSelection = selectedCounties
+                        .where((c) => c.countyName != county)
+                        .toList();
+                    _handleCountiesChanged(newSelection);
+                  },
+                ),
                 const SizedBox(height: 16),
-                _buildCountySection(),
+                _buildFilterSection(
+                  title: 'Lakes',
+                  items: selectedLakes,
+                  onAddPressed: () => _showLakeSelector(context),
+                  onItemDeleted: (lake) {
+                    final newSelection = List<String>.from(selectedLakes)
+                      ..remove(lake);
+                    _handleLakesChanged(newSelection);
+                  },
+                ),
                 const SizedBox(height: 16),
-                _buildLakeSection(),
-                const SizedBox(height: 16),
-                _buildYearSection(),
+                _buildYearFilterSection(),
                 const SizedBox(height: 24),
                 _buildSearchButton(),
                 if (MediaQuery.of(context).viewInsets.bottom > 0)
@@ -205,119 +244,110 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
         IconButton(
           icon: const Icon(Icons.close), 
           onPressed: () {
-            final state = AdvancedSearchState(
-              species: selectedSpecies,
-              counties: selectedCounties,
-              lakes: selectedLakes,
-              minYear: minYear,
-              maxYear: maxYear,
-              gameFishOnly: gameFishOnly,
-            );
-            print("DEBUG: Closing sheet with state: species=$selectedSpecies, counties=${selectedCounties.map((c) => c.countyName)}, lakes=$selectedLakes");
-            Navigator.pop(context, state);
+            print("DEBUG: Closing sheet without saving changes");
+            Navigator.pop(context);  // Simply close the sheet without returning any data
           }
         ),
       ],
     );
   }
 
-  Widget _buildSpeciesSection() {
-    return FutureBuilder<List<Species>>(
-      future: _apiService.getSpecies(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const CircularProgressIndicator();
-        
-        // Filter species list if game fish only is selected
-        final filteredSpecies = gameFishOnly 
-            ? snapshot.data!.where((s) => s.gameFish).toList()
-            : snapshot.data!;
-            
-        return SpeciesAutocomplete(
-          controller: _speciesController,
-          focusNode: _speciesFocus,
-          selectedSpecies: selectedSpecies,
-          allSpecies: filteredSpecies,
-          onSelectionChanged: _handleSpeciesChanged,
-          onClear: () => setState(() {
-            selectedSpecies.clear();
-            _speciesController.clear();
-          }),
-        );
-      },
-    );
-  }
+  Widget _buildFilterSection({
+    required String title,
+    required List<String> items,
+    required VoidCallback onAddPressed,
+    required Function(String) onItemDeleted,
+  }) {
+    // Convert IDs to names for display if this is the species section
+    final displayItems = title == 'Species' 
+        ? items.map((id) => getSpeciesNameById(id)).toList()
+        : items;
 
-  Widget _buildCountySection() {
-    return CountyAutocomplete(
-      controller: _countyController,
-      focusNode: _countyFocus,
-      selectedCounties: selectedCounties,
-      allCounties: allCounties,
-      onSelectionChanged: _handleCountiesChanged,
-      onClear: () => setState(() {
-        selectedCounties.clear();
-        _countyController.clear();
-        _updateAvailableLakes();
-      }),
-    );
-  }
-
-  Widget _buildLakeSection() {
-    return LakeAutocomplete(
-      controller: _lakeController,
-      focusNode: _lakeFocus,
-      selectedLakes: selectedLakes,
-      availableLakes: availableLakes,
-      onSelectionChanged: _handleLakesChanged,
-      onClear: () => setState(() {
-        selectedLakes.clear();
-        _lakeController.clear();
-      }),
-    );
-  }
-
-  Widget _buildYearSection() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: YearDropdown(
-            label: 'Min Year',
-            selectedYear: minYear,
-            yearOptions: yearOptions,
-            onChanged: (value) => setState(() => minYear = value),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              onPressed: onAddPressed,
+            ),
+          ],
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: YearDropdown(
-            label: 'Max Year',
-            selectedYear: maxYear,
-            yearOptions: yearOptions,
-            onChanged: (value) => setState(() => maxYear = value),
+        if (items.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Wrap(
+              spacing: 8.0,
+              runSpacing: 8.0,
+              children: displayItems
+                  .map((item) => Chip(
+                        label: Text(item),
+                        onDeleted: () => onItemDeleted(
+                          title == 'Species' 
+                              ? items[displayItems.indexOf(item)]  // Pass ID for species
+                              : item
+                        ),
+                      ))
+                  .toList(),
+            ),
           ),
-        ),
       ],
     );
   }
 
-  Widget _buildGameFishSwitch() {
-    return SwitchListTile(
-      title: const Text('Game Fish Only'),
-      value: gameFishOnly,
-      onChanged: (bool value) {
-        setState(() {
-          gameFishOnly = value;
-          // Clear species selection if switching to game fish only and non-game fish were selected
-          if (value) {
-            final gameSpecies = allSpecies
-                .where((s) => s.gameFish)
-                .map((s) => s.commonName)
-                .toList();
-            selectedSpecies.removeWhere((species) => !gameSpecies.contains(species));
-            _speciesController.text = selectedSpecies.join(', ');
-          }
-        });
-      },
+  Widget _buildYearFilterSection() {
+    final currentYear = DateTime.now().year;
+    final minYearValue = Survey.getOldestYear(availableSurveys);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Years', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('${this.minYear ?? minYearValue}'),
+              Text('${this.maxYear ?? currentYear}'),
+            ],
+          ),
+        ),
+        RangeSlider(
+          values: RangeValues(
+            double.parse(this.minYear ?? minYearValue.toString()),
+            double.parse(this.maxYear ?? currentYear.toString()),
+          ),
+          min: minYearValue.toDouble(),
+          max: currentYear.toDouble(),
+          divisions: currentYear - minYearValue,
+          labels: RangeLabels(
+            '${this.minYear ?? minYearValue}',
+            '${this.maxYear ?? currentYear}',
+          ),
+          onChanged: (RangeValues values) {
+            setState(() {
+              this.minYear = values.start.round().toString();
+              this.maxYear = values.end.round().toString();
+            });
+          },
+        ),
+        Center(
+          child: TextButton(
+            onPressed: () {
+              setState(() {
+                this.minYear = null;
+                this.maxYear = null;
+              });
+            },
+            child: const Text('Clear Range'),
+          ),
+        ),
+      ],
     );
   }
 
@@ -331,65 +361,65 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
               species: selectedSpecies,
               counties: selectedCounties,
               lakes: selectedLakes,
-              minYear: minYear,
-              maxYear: maxYear,
+              minYear: minYear?.toString(),
+              maxYear: maxYear?.toString(),
               gameFishOnly: gameFishOnly,
             );
             print("DEBUG: Search button pressed with params: $searchParams");
             
-            // Get the filtered data using the API service
-            final recentSurveys = await _apiService.getRecentSurveys(
-              species: searchParams['species'],
-              county: searchParams['county'],
-              lake: searchParams['lake'],
-              minYear: searchParams['minYear'],
-              maxYear: searchParams['maxYear'],
-              gameFishOnly: searchParams['game_fish'] == 'true',
-            );
+            // Close the sheet immediately
+            if (!mounted) return;
+            Navigator.pop(context, {
+              'searchParams': searchParams,
+              'searchState': searchState,
+            });
 
-            final biggestFish = await _apiService.getBiggestFish(
-              species: searchParams['species'],
-              county: searchParams['county'],
-              lake: searchParams['lake'],
-              minYear: searchParams['minYear'],
-              maxYear: searchParams['maxYear'],
-              gameFishOnly: searchParams['game_fish'] == 'true',
-            );
+            // Run all API requests concurrently
+            final results = await Future.wait([
+              _apiService.getSurveyData(
+                species: selectedSpecies,
+                counties: selectedCounties.map((c) => c.id).toList(),
+                sortBy: 'survey_date',
+                order: 'desc',
+                minYear: minYear?.toString(),
+                maxYear: maxYear?.toString(),
+                gameFishOnly: gameFishOnly,
+              ),
+              _apiService.getSurveyData(
+                species: selectedSpecies,
+                counties: selectedCounties.map((c) => c.id).toList(),
+                sortBy: 'max_length',
+                order: 'desc',
+                minYear: minYear?.toString(),
+                maxYear: maxYear?.toString(),
+                gameFishOnly: gameFishOnly,
+              ),
+              _apiService.getSurveyData(
+                species: selectedSpecies,
+                counties: selectedCounties.map((c) => c.id).toList(),
+                sortBy: 'total_catch',
+                order: 'desc',
+                minYear: minYear?.toString(),
+                maxYear: maxYear?.toString(),
+                gameFishOnly: gameFishOnly,
+              ),
+            ]);
 
-            final mostCaught = await _apiService.getMostCaught(
-              species: searchParams['species'],
-              county: searchParams['county'],
-              lake: searchParams['lake'],
-              minYear: searchParams['minYear'],
-              maxYear: searchParams['maxYear'],
-              gameFishOnly: searchParams['game_fish'] == 'true',
-            );
-
-            if (mounted) {
-              Navigator.pop(context, {
-                'recentSurveys': recentSurveys,
-                'biggestFish': biggestFish,
-                'mostCaught': mostCaught,
+            // Send results back through a callback
+            if (widget.onSearchComplete != null) {
+              widget.onSearchComplete!({
+                'recentSurveys': results[0],
+                'biggestFish': results[1],
+                'mostCaught': results[2],
                 'searchParams': searchParams,
                 'searchState': searchState,
               });
             }
+
           } catch (e) {
             print("DEBUG: Error during search: $e");
-            if (mounted) {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Error'),
-                  content: Text('Failed to fetch search results: $e'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('OK'),
-                    ),
-                  ],
-                ),
-              );
+            if (widget.onSearchError != null) {
+              widget.onSearchError!(e.toString());
             }
           }
         }
@@ -403,12 +433,10 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
     return {
       if (selectedSpecies.isNotEmpty) 'species': selectedSpecies,
       if (selectedCounties.isNotEmpty) 
-        'county': selectedCounties
-            .map((county) => county.countyName.replaceAll(' County', ''))
-            .toList(),
+        'counties': selectedCounties.map((county) => county.id).toList(),
       if (selectedLakes.isNotEmpty) 'lake': selectedLakes,
-      if (minYear != null) 'minYear': minYear.toString(),
-      if (maxYear != null) 'maxYear': maxYear.toString(),
+      if (minYear != null) 'minYear': minYear,
+      if (maxYear != null) 'maxYear': maxYear,
       if (gameFishOnly) 'game_fish': 'true',
     };
   }
@@ -416,5 +444,315 @@ class _AdvancedSearchSheetState extends State<AdvancedSearchSheet> {
   void _initializeYearOptions() {
     final currentYear = DateTime.now().year;
     yearOptions = List.generate(30, (index) => currentYear - index);
+  }
+
+  void _showSpeciesSelector(BuildContext context) {
+    final List<String> tempSelection = List.from(selectedSpecies);
+    bool tempGameFishOnly = gameFishOnly;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Select Species'),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              List<Species> sortedSpecies = List<Species>.from(allSpecies)
+                ..sort((a, b) => a.commonName.compareTo(b.commonName));
+              
+              if (tempGameFishOnly) {
+                sortedSpecies = sortedSpecies.where((s) => s.gameFish).toList();
+              }
+                
+              return SizedBox(
+                width: double.maxFinite,
+                height: 400,
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      title: const Text('Game Fish Only'),
+                      value: tempGameFishOnly,
+                      onChanged: (bool value) {
+                        setState(() {
+                          tempGameFishOnly = value;
+                          if (value) {
+                            tempSelection.removeWhere(
+                              (speciesId) => !allSpecies
+                                  .where((s) => s.gameFish)
+                                  .map((s) => s.id)
+                                  .contains(speciesId)
+                            );
+                          }
+                        });
+                      },
+                    ),
+                    const Divider(),
+                    Expanded(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: sortedSpecies.length,
+                        itemBuilder: (context, index) {
+                          final species = sortedSpecies[index];
+                          return CheckboxListTile(
+                            title: Text(species.commonName),
+                            subtitle: species.gameFish ? const Text('Game Fish') : null,
+                            value: tempSelection.contains(species.id),  // Changed to use ID
+                            onChanged: (bool? value) {
+                              setState(() {
+                                if (value == true) {
+                                  tempSelection.add(species.id);  // Store ID
+                                } else {
+                                  tempSelection.remove(species.id);  // Remove ID
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  gameFishOnly = tempGameFishOnly;
+                  _handleSpeciesChanged(tempSelection);
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showCountySelector(BuildContext context) {
+    final List<County> tempSelection = List.from(selectedCounties);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Select Counties'),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return SizedBox(
+                width: double.maxFinite,
+                height: 400,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: allCounties.length,
+                  itemBuilder: (context, index) {
+                    final county = allCounties[index];
+                    return CheckboxListTile(
+                      title: Text(county.countyName),
+                      subtitle: Text('${county.lakes.length} lakes'),
+                      value: tempSelection.contains(county),
+                      onChanged: (bool? value) {
+                        setState(() {
+                          if (value == true) {
+                            tempSelection.add(county);
+                          } else {
+                            tempSelection.remove(county);
+                          }
+                        });
+                      },
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                _handleCountiesChanged(tempSelection);
+                Navigator.pop(context);
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showLakeSelector(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => _LakeSelectorDialog(
+        selectedLakes: selectedLakes,
+        availableLakes: availableLakes,
+        onLakesChanged: _handleLakesChanged,
+      ),
+    );
+  }
+
+  // Add this method to load surveys
+  void _loadSurveys() async {
+    try {
+      final surveys = await _apiService.getRecentSurveys();
+      setState(() {
+        availableSurveys = surveys;
+      });
+    } catch (e) {
+      print('Error loading surveys: $e');
+      // If loading fails, we'll use the fallback in getOldestYear
+    }
+  }
+
+  // Add a helper method to convert between IDs and names
+  String getSpeciesNameById(String id) {
+    final species = allSpecies.firstWhere(
+      (s) => s.id == id,
+      orElse: () => Species(
+        id: id,
+        commonName: 'Unknown Species',
+        scientificName: '',
+        imageUrl: '',
+        description: '',
+        gameFish: false,
+      ),
+    );
+    return species.commonName;
+  }
+
+  String? getSpeciesIdByName(String name) {
+    final species = allSpecies.firstWhere(
+      (s) => s.commonName == name,
+      orElse: () => Species(
+        id: '',
+        commonName: '',
+        scientificName: '',
+        imageUrl: '',
+        description: '',
+        gameFish: false,
+      ),
+    );
+    return species.id.isEmpty ? null : species.id;
+  }
+}
+
+class _LakeSelectorDialog extends StatefulWidget {
+  final List<String> selectedLakes;
+  final List<String> availableLakes;
+  final Function(List<String>) onLakesChanged;
+
+  const _LakeSelectorDialog({
+    required this.selectedLakes,
+    required this.availableLakes,
+    required this.onLakesChanged,
+  });
+
+  @override
+  State<_LakeSelectorDialog> createState() => _LakeSelectorDialogState();
+}
+
+class _LakeSelectorDialogState extends State<_LakeSelectorDialog> {
+  late TextEditingController searchController;
+  late List<String> tempSelection;
+  late List<String> filteredLakes;
+
+  @override
+  void initState() {
+    super.initState();
+    searchController = TextEditingController();
+    tempSelection = List.from(widget.selectedLakes);
+    filteredLakes = List.from(widget.availableLakes);
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Select Lakes'),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 400,
+        child: Column(
+          children: [
+            TextField(
+              controller: searchController,
+              decoration: const InputDecoration(
+                hintText: 'Search lakes...',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  if (value.isEmpty) {
+                    filteredLakes = List.from(widget.availableLakes);
+                  } else {
+                    filteredLakes = widget.availableLakes
+                        .where((lake) => lake.toLowerCase()
+                            .contains(value.toLowerCase()))
+                        .toList();
+                  }
+                });
+              },
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text('Available Lakes: ${filteredLakes.length}'),
+            ),
+            Expanded(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: filteredLakes.length,
+                itemBuilder: (context, index) {
+                  final lake = filteredLakes[index];
+                  return CheckboxListTile(
+                    title: Text(lake),
+                    value: tempSelection.contains(lake),
+                    onChanged: (bool? value) {
+                      setState(() {
+                        if (value == true) {
+                          tempSelection.add(lake);
+                        } else {
+                          tempSelection.remove(lake);
+                        }
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () {
+            widget.onLakesChanged(tempSelection);
+            Navigator.pop(context);
+          },
+          child: const Text('Apply'),
+        ),
+      ],
+    );
   }
 }

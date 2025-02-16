@@ -5,9 +5,11 @@ class AdvancedSearchState {
   final List<String> species;
   final List<County> counties;
   final List<String> lakes;
-  final int? minYear;
-  final int? maxYear;
+  final String? minYear;
+  final String? maxYear;
   final bool gameFishOnly;
+  final int? limit;
+  final int? page;
 
   const AdvancedSearchState({
     this.species = const [],
@@ -16,15 +18,19 @@ class AdvancedSearchState {
     this.minYear,
     this.maxYear,
     this.gameFishOnly = false,
+    this.limit,
+    this.page,
   });
 
   AdvancedSearchState copyWith({
     List<String>? species,
     List<County>? counties,
     List<String>? lakes,
-    int? minYear,
-    int? maxYear,
+    String? minYear,
+    String? maxYear,
     bool? gameFishOnly,
+    int? limit,
+    int? page,
   }) {
     return AdvancedSearchState(
       species: species ?? this.species,
@@ -33,6 +39,8 @@ class AdvancedSearchState {
       minYear: minYear ?? this.minYear,
       maxYear: maxYear ?? this.maxYear,
       gameFishOnly: gameFishOnly ?? this.gameFishOnly,
+      limit: limit ?? this.limit,
+      page: page ?? this.page,
     );
   }
 }
