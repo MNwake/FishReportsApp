@@ -28,7 +28,12 @@ class _CountyScreenState extends ConsumerState<CountyScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.county.countyName}'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('MN County'),
+          ],
+        ),
       ),
       body: statsAsync.when(
         data: (stats) => SingleChildScrollView(

@@ -1,16 +1,43 @@
-# frontend
+# Fish Reports Mobile App
 
-A new Flutter project.
+This Flutter mobile application serves as the client for the Fish Reports project. It consumes data from the Fish Reports Server, displaying fish survey data, graphs, and statistics in an intuitive and user-friendly interface.
+
+## Overview
+
+- Platform: Flutter
+- Purpose: Consume and display data from the Fish Reports Server
+- Features:
+  - View fish survey data with filtering and search capabilities
+  - Display graphical representations of fish counts
+  - Browse county and species statistics
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+### 1. Clone the Repository
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+git clone https://github.com/MNwake/FishReportsApp.git
+cd FishReportsApp
+```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### 2. Install Dependencies
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Ensure you have Flutter installed. Then, run:
+
+```bash
+flutter pub get
+```
+
+### 3. Run the Application
+
+Launch the app on an emulator or a physical device:
+
+```bash
+flutter run
+```
+
+## Configuration
+
+- The app is configured to communicate with the Fish Reports Server API. Update the API endpoint in the source code if necessary.
+
+Happy coding and enjoy exploring fish survey data on the go!

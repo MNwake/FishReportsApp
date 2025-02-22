@@ -36,7 +36,9 @@ class FishData {
       dowNumber: int.parse(json['dow_number'].toString()),
       surveyType: json['survey_type'] as String,
       surveySubType: json['survey_sub_type'] as String,
-      imageUrl: json['image_url'] as String,
+      imageUrl: json['image_url'] == null || (json['image_url'] as String).isEmpty 
+          ? 'assets/images/No_Image_Available.jpg' 
+          : json['image_url'] as String,
       lakeName: json['lake_name'] as String,
       maxLength: int.parse(json['max_length'].toString()),
       minLength: int.parse(json['min_length'].toString()),

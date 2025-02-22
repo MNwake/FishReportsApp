@@ -26,7 +26,12 @@ class SpeciesScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(species.commonName),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Fish Species'),
+          ],
+        ),
       ),
       body: statsAsync.when(
         data: (stats) => SingleChildScrollView(
@@ -35,17 +40,23 @@ class SpeciesScreen extends ConsumerWidget {
             children: [
               // Hero image section
               if (species.imageUrl.isNotEmpty)
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: Image.network(
-                    species.imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Center(
-                        child: Icon(Icons.image_not_supported, size: 48),
-                      );
-                    },
-                  ),
+                Container(
+                  width: double.infinity,  // Takes full width
+                  child: species.imageUrl.startsWith('assets/') 
+                      ? Image.asset(
+                          species.imageUrl,
+                          fit: BoxFit.fitWidth,  // Fits to width
+                        )
+                      : Image.network(
+                          species.imageUrl,
+                          fit: BoxFit.fitWidth,  // Fits to width
+                          errorBuilder: (context, error, stackTrace) {
+                            return Image.asset(
+                              'assets/images/No_Image_Available.jpg',
+                              fit: BoxFit.fitWidth,  // Fits to width
+                            );
+                          },
+                        ),
                 ),
 
               Padding(
@@ -134,91 +145,66 @@ class SpeciesScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
 
-                    // Sort and build the counties list
-                    FutureBuilder<List<County>>(
-                      future: ref.read(apiServiceProvider).getCounties(),
-                      builder: (context, countiesSnapshot) {
-                        if (!countiesSnapshot.hasData) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
+                    SizedBox(
+                      height: 280,  // Match the CountyCard height
+                      child: FutureBuilder<List<County>>(
+                        future: ref.read(apiServiceProvider).getCounties(),
+                        builder: (context, countiesSnapshot) {
+                          if (!countiesSnapshot.hasData) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
 
-                        final counties = stats.counties
-                            .where((c) => c.percentage > 0)
-                            .map((countyStats) {
-                              final county = countiesSnapshot.data!.firstWhere(
-                                (c) => c.id == countyStats.id,
-                                orElse: () => County(
-                                  id: '',
-                                  countyName: 'Unknown County',
-                                  fipsCode: '',
-                                  countySeat: '',
-                                  established: 0,
-                                  origin: '',
-                                  etymology: '',
-                                  population: 0,
-                                  areaSqMiles: 0,
-                                  mapImageUrl: '',
-                                  lakes: [],
+                          final counties = stats.counties
+                              .where((c) => c.percentage > 0)
+                              .map((countyStats) {
+                                final county = countiesSnapshot.data!.firstWhere(
+                                  (c) => c.id == countyStats.id,
+                                  orElse: () => County(
+                                    id: '',
+                                    countyName: 'Unknown County',
+                                    fipsCode: '',
+                                    countySeat: '',
+                                    established: 0,
+                                    origin: '',
+                                    etymology: '',
+                                    population: 0,
+                                    areaSqMiles: 0,
+                                    mapImageUrl: '',
+                                    lakes: [],
+                                  ),
+                                );
+                                return MapEntry(county, countyStats.percentage);
+                              })
+                              .toList()
+                            ..sort((a, b) => a.key.countyName.compareTo(b.key.countyName));
+
+                          return ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: counties.length,
+                            itemBuilder: (context, index) {
+                              final entry = counties[index];
+                              final county = entry.key;
+                              final percentage = entry.value;
+                              
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: CountyCard(
+                                  county: county,
+                                  subheader: '${percentage.toStringAsFixed(1)}% of lakes',
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => CountyScreen(county: county),
+                                      ),
+                                    );
+                                  },
                                 ),
                               );
-                              return MapEntry(county, countyStats.percentage);
-                            })
-                            .toList()
-                          ..sort((a, b) => a.key.countyName.compareTo(b.key.countyName));  // Sort alphabetically by county name
-
-                        return ListView(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          children: counties.map((entry) {
-                            final county = entry.key;
-                            final percentage = entry.value;
-                            
-                            return Card(
-                              margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                              child: InkWell(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => CountyScreen(county: county),
-                                    ),
-                                  );
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            county.countyName,
-                                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          Icon(
-                                            Icons.chevron_right,
-                                            color: Theme.of(context).colorScheme.primary,
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${percentage.toStringAsFixed(1)}% of lakes in county have ${species.commonName}',
-                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                          color: Theme.of(context).textTheme.bodySmall?.color,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        );
-                      },
+                            },
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ),

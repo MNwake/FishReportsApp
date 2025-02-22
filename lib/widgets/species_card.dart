@@ -27,15 +27,26 @@ class SpeciesCard extends StatelessWidget {
             children: [
               Expanded(
                 flex: 2,
-                child: Image.network(
-                  species.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Center(
-                      child: Icon(Icons.pets, size: 48),
-                    );
-                  },
-                ),
+                child: species.imageUrl.startsWith('assets') 
+                    ? Image.asset(
+                        species.imageUrl,
+                        fit: BoxFit.cover,
+                      )
+                    : species.imageUrl.isEmpty
+                        ? Image.asset(
+                            'assets/images/No_Image_Available.jpg',
+                            fit: BoxFit.cover,
+                          )
+                        : Image.network(
+                            species.imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Image.asset(
+                                'assets/images/No_Image_Available.jpg',
+                                fit: BoxFit.cover,
+                              );
+                            },
+                          ),
               ),
               Expanded(
                 flex: 1,

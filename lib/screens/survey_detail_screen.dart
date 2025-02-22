@@ -8,6 +8,7 @@ import '../widgets/game_fish_badge.dart';
 import '../models/fish_data.dart';
 import '../widgets/length_distribution_chart.dart';
 import '../models/length_data.dart';
+import 'package:intl/intl.dart';
 
 class SurveyDetailScreen extends StatefulWidget {
   final FishData survey;
@@ -75,23 +76,34 @@ class _SurveyDetailScreenState extends State<SurveyDetailScreen> with SingleTick
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.survey.lakeName),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Survey Report'),
+          ],
+        ),
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
             // Hero image section
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Image.network(
-                widget.survey.imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Center(
-                    child: Icon(Icons.image_not_supported, size: 48),
-                  );
-                },
-              ),
+            Container(
+              width: double.infinity,  // Takes full width
+              child: widget.survey.imageUrl.startsWith('assets/') 
+                  ? Image.asset(
+                      widget.survey.imageUrl,
+                      fit: BoxFit.fitWidth,  // Fits to width
+                    )
+                  : Image.network(
+                      widget.survey.imageUrl,
+                      fit: BoxFit.fitWidth,  // Fits to width
+                      errorBuilder: (context, error, stackTrace) {
+                        return Image.asset(
+                          'assets/images/No_Image_Available.jpg',
+                          fit: BoxFit.fitWidth,  // Fits to width
+                        );
+                      },
+                    ),
             ),
             
             Padding(
@@ -111,6 +123,10 @@ class _SurveyDetailScreenState extends State<SurveyDetailScreen> with SingleTick
                   ),
                   Text(
                     'County: ${widget.survey.countyName}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  Text(
+                    'Survey Date: ${DateFormat.yMMMMd().format(DateTime.parse(widget.survey.surveyDate))}',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
